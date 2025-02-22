@@ -1,106 +1,100 @@
 import tkinter as tk
 from tkinter import ttk
-from math import sqrt, pi, tan
+import math
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-# Функции расчета
-def calculate_hit_probability(target_crossection, distance, weapon_arc, skill_difference, distance_change):
-    target_radius = sqrt(target_crossection / pi)
-    hit_probability = (target_radius - (distance_change * (1 + skill_difference * 0.1))) / (
-        tan(weapon_arc / 2) * distance
-    )
-    return max(0, min(1, hit_probability))  # Вероятность в пределах [0, 1]
+def shot(h, alp): 
+    return math.pi * (h * math.tan(math.radians(alp))) ** 2
 
-def calculate_movement_change(acceleration, time):
-    return 0.5 * acceleration * time**2
+def dispers(h, alp_dis):
+    return math.pi * (h * math.tan(math.radians(alp_dis))) ** 2
 
-# Функция обновления данных
-def update():
-    try:
-        target_crossection = float(entry_target_crossection.get())
-        distance = float(entry_distance.get())
-        weapon_arc = float(entry_weapon_arc.get())
-        skill_difference = float(entry_skill_difference.get())
-        distance_change = float(entry_distance_change.get())
-        acceleration = float(entry_acceleration.get())
-        time = float(entry_time.get())
-        
-        hit_probability = calculate_hit_probability(
-            target_crossection, distance, weapon_arc, skill_difference, distance_change
-        )
-        movement_change = calculate_movement_change(acceleration, time)
-        
-        label_result.config(
-            text=f"Вероятность попадания: {hit_probability:.2%}\n"
-                 f"Изменение положения: {movement_change:.2f} км"
-        )
-        
-        draw_graph(target_crossection, distance_change, movement_change)
-    except ValueError:
-        label_result.config(text="Введите корректные числовые значения!")
+def targ(rad):
+    return math.pi * rad ** 2
 
-# Рисование графика
-def draw_graph(crossection, distance_change, movement_change):
-    canvas.delete("all")
-    target_radius = sqrt(crossection / pi)
+def bias(h, vel, acc):
+    return (h / vel) * acc
+
+def intersection_area(r1, r2, d):
+    if d >= r1 + r2:
+        return 0  # Нет пересечения
+    elif d <= abs(r1 - r2):
+        return math.pi * min(r1, r2) ** 2  # Один круг полностью внутри другого
     
-    # Центр цели
-    canvas_width = canvas.winfo_width()
-    canvas_height = canvas.winfo_height()
-    center_x = canvas_width // 2
-    center_y = canvas_height // 2
+    part1 = r1**2 * math.acos((d**2 + r1**2 - r2**2) / (2 * d * r1))
+    part2 = r2**2 * math.acos((d**2 + r2**2 - r1**2) / (2 * d * r2))
+    part3 = 0.5 * math.sqrt((-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2))
     
-    # Окружность цели
-    canvas.create_oval(
-        center_x - target_radius, center_y - target_radius,
-        center_x + target_radius, center_y + target_radius,
-        outline="blue", width=2, tags="target"
-    )
-    
-    # Снаряд
-    canvas.create_oval(
-        center_x - distance_change, center_y - distance_change,
-        center_x + distance_change, center_y + distance_change,
-        outline="red", width=2, tags="missile"
-    )
+    return part1 + part2 - part3
 
-# Интерфейс
+def calculate():
+    h = float(entry_h.get())
+    alp = float(entry_alp.get())
+    alp_dis = float(entry_alp_dis.get())
+    rad_targ = float(entry_rad.get())
+    vel = float(entry_vel.get())
+    acc = float(entry_acc.get())
+    
+    r_hit = h * math.tan(math.radians(alp))
+    r_disp = h * math.tan(math.radians(alp_dis))
+    d = bias(h, vel, acc)
+    
+    S_targ = targ(rad_targ)
+    S_disp = dispers(h, alp_dis)
+    S_intersection = intersection_area(rad_targ, r_disp, d)
+    
+    probability = (S_intersection / S_disp) * 100 if S_disp > 0 else 0
+    label_result.config(text=f"Вероятность попадания: {probability:.2f}%")
+    
+    plot_circles(rad_targ, r_hit, r_disp, d)
+
+def plot_circles(target_radius, hit_radius, dispersion_radius, distance):
+    ax.clear()
+    ax.set_xlim(-dispersion_radius * 1.5, dispersion_radius * 1.5)
+    ax.set_ylim(-dispersion_radius * 1.5, dispersion_radius * 1.5)
+    
+    target_circle = Circle((0, 0), target_radius, color='blue', alpha=0.5, label='Цель')
+    hit_circle = Circle((distance, 0), hit_radius, color='red', alpha=0.5, label='Попадание')
+    dispersion_circle = Circle((distance, 0), dispersion_radius, color='orange', alpha=0.3, label='Разброс')
+    
+    ax.add_patch(target_circle)
+    ax.add_patch(hit_circle)
+    ax.add_patch(dispersion_circle)
+    
+    ax.legend()
+    canvas.draw()
+
 root = tk.Tk()
-root.title("Расчет попадания в космический корабль")
+root.title("Симуляция попадания снаряда")
 
-frame = ttk.Frame(root, padding="10")
-frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
+frame = ttk.Frame(root)
+frame.pack()
 
-# Поля ввода
-labels = [
-    "Площадь поперечного сечения цели (км²):",
-    "Расстояние до цели (км):",
-    "Угол оружия (рад):",
-    "Разница в навыках (от -1 до 1):",
-    "Изменение расстояния (км):",
-    "Ускорение (км/с²):",
-    "Время (с):",
-]
-entries = []
+entry_h = ttk.Entry(frame)
+entry_alp = ttk.Entry(frame)
+entry_alp_dis = ttk.Entry(frame)
+entry_rad = ttk.Entry(frame)
+entry_vel = ttk.Entry(frame)
+entry_acc = ttk.Entry(frame)
 
-for i, label_text in enumerate(labels):
-    ttk.Label(frame, text=label_text).grid(row=i, column=0, sticky=tk.W)
-    entry = ttk.Entry(frame, width=15)
-    entry.grid(row=i, column=1, sticky=tk.W)
-    entries.append(entry)
+labels = ["Высота (h):", "Угол прицела (°):", "Разброс (°):", "Радиус цели:", "Скорость снаряда:", "Ускорение цели:"]
+entries = [entry_h, entry_alp, entry_alp_dis, entry_rad, entry_vel, entry_acc]
 
-(entry_target_crossection, entry_distance, entry_weapon_arc,
- entry_skill_difference, entry_distance_change, entry_acceleration,
- entry_time) = entries
+ttks = zip(labels, entries)
+for i, (label, entry) in enumerate(ttks):
+    ttk.Label(frame, text=label).grid(row=i, column=0)
+    entry.grid(row=i, column=1)
 
-# Результаты
-label_result = ttk.Label(frame, text="Результаты появятся здесь", foreground="green")
-label_result.grid(row=len(labels), column=0, columnspan=2, sticky=tk.W)
+button_calculate = ttk.Button(frame, text="Рассчитать", command=calculate)
+button_calculate.grid(columnspan=2)
 
-# Кнопка расчета
-ttk.Button(frame, text="Рассчитать", command=update).grid(row=len(labels) + 1, column=0, columnspan=2)
+label_result = ttk.Label(frame, text="Вероятность попадания: ")
+label_result.grid(columnspan=2)
 
-# Канва для графики
-canvas = tk.Canvas(root, width=400, height=400, bg="white")
-canvas.grid(row=1, column=0, sticky=(tk.W, tk.E))
+fig, ax = plt.subplots()
+canvas = FigureCanvasTkAgg(fig, master=root)
+canvas.get_tk_widget().pack()
 
 root.mainloop()
