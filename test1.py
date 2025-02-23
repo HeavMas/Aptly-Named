@@ -31,15 +31,17 @@ def intersection_area(r1, r2, d):
 
 def calculate():
     h = float(entry_h.get())
-    alp = float(entry_alp.get())
-    alp_dis = float(entry_alp_dis.get())
+    p_alp = float(entry_alp.get())
+    dis = float(entry_alp_dis.get())
     rad_targ = float(entry_rad.get())
     vel = float(entry_vel.get())
     acc = float(entry_acc.get())
-    
+    alp = p_alp - dis
+    alp_dis = p_alp + dis
     r_hit = h * math.tan(math.radians(alp))
     r_disp = h * math.tan(math.radians(alp_dis))
     d = bias(h, vel, acc)
+    
     
     S_targ = targ(rad_targ)
     S_disp = dispers(h, alp_dis)
@@ -79,7 +81,7 @@ entry_rad = ttk.Entry(frame)
 entry_vel = ttk.Entry(frame)
 entry_acc = ttk.Entry(frame)
 
-labels = ["Высота (h):", "Угол прицела (°):", "Разброс (°):", "Радиус цели:", "Скорость снаряда:", "Ускорение цели:"]
+labels = ["Дальность (h) (м):", "Разброс орудия (°):", "Разброс снаряда (°):", "Радиус цели (м):", "Скорость снаряда(м/с):", "Ускорение цели(м/с^2):"]
 entries = [entry_h, entry_alp, entry_alp_dis, entry_rad, entry_vel, entry_acc]
 
 ttks = zip(labels, entries)
@@ -93,7 +95,7 @@ button_calculate.grid(columnspan=2)
 label_result = ttk.Label(frame, text="Вероятность попадания: ")
 label_result.grid(columnspan=2)
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(20, 20))  # Размер графика
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.get_tk_widget().pack()
 
